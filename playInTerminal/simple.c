@@ -1,15 +1,22 @@
 #include <stdint.h>
 #include <time.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
 #define CHANNEL_NUM 3
 #define W 1280
 #define H 720
 #define IMAGE 0
 #define VIDEO 1
 
-int asciify(int pixel, int charRange){
+int SCN_LINES;
+int SCN_COLS;
+int res;
+int asciify(int pixel, int charRange)
+{
 	char map_large[] ="$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ";
 	char map_small[] ="@%#*+=-:. ";
 	
@@ -17,24 +24,27 @@ int asciify(int pixel, int charRange){
 					map_large[(int)((pixel/255.0)*70)];
 }
 
-void printImage(uint8_t* rgb_image, int width, int height,int res, int charRange){
-	for (int i = 0; i < height; i+=res)
+void printImage(uint8_t* rgb_image, int width, int height,int charRange)
+{
+	res = height/SCN_LINES;
+	for (int i = 0; i < height; i += res)
     {
-    	for (int j = 0; j < width; j+=res)
+    	for (int j = 0; j < width; j += res)
     	{
     		printf("%c", asciify(*((rgb_image + (i * width)+j)),charRange));
     	}
     	printf("\n");
     }	
 }
-void displayImage(char* file, int resolution, int charRange){
+void displayImage(char* file, int charRange)
+{
 
     int width, height, bpp;
     uint8_t* rgb_image = stbi_load(file, &width, &height, &bpp, 1);
-    printImage(rgb_image, width, height, resolution,charRange);	
+    printImage(rgb_image, width, height, charRange);	
 	stbi_image_free(rgb_image);
 }
-void playVideo(char* file, long fps, int resolution,int charRange)
+void playVideo(char* file, long fps, int charRange)
 {
     int count;
     uint8_t frame[H][W][3] = {0};
@@ -60,7 +70,7 @@ void playVideo(char* file, long fps, int resolution,int charRange)
         {
             gray[y][x] = (frame[y][x][0] + frame[y][x][1] + frame[y][x][2])/3;
         }
-        printImage((uint8_t *)&gray, W, H, resolution,charRange ); 
+        printImage((uint8_t *)&gray, W, H, charRange ); 
         nanosleep(&tim,NULL);
         system("clear");
     }
@@ -69,22 +79,30 @@ void playVideo(char* file, long fps, int resolution,int charRange)
     fflush(pipein);
     pclose(pipein);    
 }
-int main(int argc, char const *argv[])
+int getFileType(char* file)
+{
+	///TODO: check file type
+	return VIDEO;
+	// return IMAGE;
+}
+
+int main(int argc, char const *argv[]) 
 {
 
-	//char* file = "video.mp4";
-	//int type = VIDEO;
-	char* file = "image.jpg";
-	int type = IMAGE;
+	struct winsize w;
+	ioctl(0, TIOCGWINSZ, &w);
+	SCN_LINES = w.ws_row;
+	SCN_COLS = w.ws_col;
+	char* file = "video.mp4";
+	// char* file = "image.jpg";
 	int fps = 24;
-	int resolution = 4;
-	int charRange = 2;
-	switch(type){
+	int charRange = 1;
+	switch(getFileType(file)){
 		case IMAGE:
-			displayImage(file, resolution,charRange);
+			displayImage(file,charRange);
 			break;
 		case VIDEO:
-			playVideo(file,fps, resolution,charRange);
+			playVideo(file,fps,charRange);
 			break;
 	}
     return 0;
